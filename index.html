@@ -1,0 +1,2193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class Attendance System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .sidebar {
+            transition: all 0.3s ease;
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: -100%;
+                top: 0;
+                z-index: 50;
+                height: 100vh;
+            }
+            .sidebar.active {
+                left: 0;
+            }
+        }
+        .notification {
+            transition: transform 0.3s ease-in-out;
+        }
+        .notification.show {
+            transform: translateX(0) !important;
+        }
+        .modal {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .modal.show {
+            opacity: 1;
+        }
+        .hover-scale {
+            transition: transform 0.2s ease;
+        }
+        .hover-scale:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+    <div class="flex min-h-screen">
+        <!-- Mobile menu button -->
+        <button class="md:hidden fixed top-4 left-4 z-50 bg-blue-600 text-white p-2 rounded-lg shadow-lg hover-scale" id="mobileMenuBtn">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <!-- Sidebar -->
+        <div class="sidebar w-64 bg-gradient-to-b from-blue-800 to-blue-900 text-white p-4 flex flex-col shadow-xl" id="sidebar">
+            <div class="flex items-center justify-between mb-8">
+                <div class="flex items-center">
+                    <i class="fas fa-graduation-cap text-2xl mr-3"></i>
+                    <h1 class="text-xl font-bold">Attendance Pro</h1>
+                </div>
+                <button class="md:hidden text-white hover:text-gray-300 transition" id="closeMenuBtn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <nav class="flex-1">
+                <ul class="space-y-2">
+                    <li>
+                        <a href="#" class="nav-link flex items-center p-3 rounded-lg hover:bg-blue-700 transition-all duration-200 active" id="dashboardLink">
+                            <i class="fas fa-tachometer-alt mr-3"></i>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="nav-link flex items-center p-3 rounded-lg hover:bg-blue-700 transition-all duration-200" id="attendanceLink">
+                            <i class="fas fa-clipboard-check mr-3"></i>
+                            Take Attendance
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="nav-link flex items-center p-3 rounded-lg hover:bg-blue-700 transition-all duration-200" id="classesLink">
+                            <i class="fas fa-chalkboard-teacher mr-3"></i>
+                            Manage Classes
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="nav-link flex items-center p-3 rounded-lg hover:bg-blue-700 transition-all duration-200" id="studentsLink">
+                            <i class="fas fa-users mr-3"></i>
+                            Manage Students
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="nav-link flex items-center p-3 rounded-lg hover:bg-blue-700 transition-all duration-200" id="reportsLink">
+                            <i class="fas fa-file-alt mr-3"></i>
+                            Reports
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="nav-link flex items-center p-3 rounded-lg hover:bg-blue-700 transition-all duration-200" id="settingsLink">
+                            <i class="fas fa-cog mr-3"></i>
+                            Settings
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <div class="mt-auto pt-4 border-t border-blue-700">
+                <div class="flex items-center p-2 rounded-lg hover:bg-blue-700 transition cursor-pointer">
+                    <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center mr-3">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium">Admin User</p>
+                        <p class="text-xs text-blue-300">System Administrator</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main content -->
+        <div class="flex-1 p-4 md:p-6 overflow-auto">
+            <!-- Dashboard Content -->
+            <div id="dashboardContent" class="fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-3xl font-bold text-gray-800">Dashboard</h2>
+                        <p class="text-gray-600 mt-1">Overview of your attendance system</p>
+                    </div>
+                    <div class="text-sm text-gray-600 bg-white px-4 py-2 rounded-lg shadow">
+                        <i class="fas fa-calendar-alt mr-2"></i>
+                        <span id="currentDate"></span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <!-- Statistics Cards -->
+                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white hover-scale">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-blue-100 text-sm">Today's Sessions</p>
+                                <h3 class="text-3xl font-bold" id="todayAttendanceCount">0</h3>
+                            </div>
+                            <div class="p-3 rounded-full bg-white bg-opacity-20">
+                                <i class="fas fa-clipboard-check text-2xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white hover-scale">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-green-100 text-sm">Total Classes</p>
+                                <h3 class="text-3xl font-bold" id="totalClassesCount">0</h3>
+                            </div>
+                            <div class="p-3 rounded-full bg-white bg-opacity-20">
+                                <i class="fas fa-chalkboard-teacher text-2xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white hover-scale">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-purple-100 text-sm">Total Students</p>
+                                <h3 class="text-3xl font-bold" id="totalStudentsCount">0</h3>
+                            </div>
+                            <div class="p-3 rounded-full bg-white bg-opacity-20">
+                                <i class="fas fa-users text-2xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl shadow-lg p-6 text-white hover-scale">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-orange-100 text-sm">This Month</p>
+                                <h3 class="text-3xl font-bold" id="monthlyAttendanceCount">0</h3>
+                            </div>
+                            <div class="p-3 rounded-full bg-white bg-opacity-20">
+                                <i class="fas fa-calendar-alt text-2xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    <!-- Recent Attendance Table -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-xl font-semibold text-gray-800">Recent Attendance</h3>
+                            <button class="text-blue-600 text-sm font-medium hover:text-blue-800 transition">View All</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Present</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200" id="recentAttendanceTable">
+                                    <!-- Populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Attendance Chart -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-6">Attendance Overview</h3>
+                        <canvas id="attendanceChart" height="300"></canvas>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-6">Quick Actions</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <button class="quick-action-btn bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg p-4 flex items-center transition" id="quickAttendance">
+                            <i class="fas fa-plus-circle text-blue-600 text-2xl mr-4"></i>
+                            <div class="text-left">
+                                <h4 class="font-semibold text-gray-800">Take Attendance</h4>
+                                <p class="text-sm text-gray-600">Mark today's attendance</p>
+                            </div>
+                        </button>
+                        <button class="quick-action-btn bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg p-4 flex items-center transition" id="quickAddStudent">
+                            <i class="fas fa-user-plus text-green-600 text-2xl mr-4"></i>
+                            <div class="text-left">
+                                <h4 class="font-semibold text-gray-800">Add Student</h4>
+                                <p class="text-sm text-gray-600">Register new student</p>
+                            </div>
+                        </button>
+                        <button class="quick-action-btn bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg p-4 flex items-center transition" id="quickReport">
+                            <i class="fas fa-chart-bar text-purple-600 text-2xl mr-4"></i>
+                            <div class="text-left">
+                                <h4 class="font-semibold text-gray-800">Generate Report</h4>
+                                <p class="text-sm text-gray-600">View attendance reports</p>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attendance Content -->
+            <div id="attendanceContent" class="hidden fade-in">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-3xl font-bold text-gray-800">Take Attendance</h2>
+                        <p class="text-gray-600 mt-1">Mark student attendance for classes</p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button id="saveAttendanceBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center transition shadow-lg">
+                            <i class="fas fa-save mr-2"></i> Save
+                        </button>
+                        <button id="printAttendanceBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg flex items-center transition shadow-lg">
+                            <i class="fas fa-print mr-2"></i> Print
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Select Class</label>
+                            <select id="classSelect" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                                <option value="">-- Select Class --</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                            <input type="date" id="attendanceDate" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Subject</label>
+                            <select id="subjectSelect" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                                <option value="">-- Select Subject --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-semibold text-gray-800">Students List</h3>
+                        <div class="flex items-center space-x-2">
+                            <button id="markAllPresentBtn" class="text-xs bg-green-100 hover:bg-green-200 text-green-800 px-3 py-2 rounded-lg transition">
+                                <i class="fas fa-check mr-1"></i> Mark All Present
+                            </button>
+                            <button id="markAllAbsentBtn" class="text-xs bg-red-100 hover:bg-red-200 text-red-800 px-3 py-2 rounded-lg transition">
+                                <i class="fas fa-times mr-1"></i> Mark All Absent
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roll No</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="attendanceTableBody">
+                                <tr>
+                                    <td colspan="4" class="px-6 py-8 text-center text-gray-500">
+                                        <i class="fas fa-users text-4xl text-gray-300 mb-3"></i>
+                                        <p>Please select a class to view students</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Classes Content -->
+            <div id="classesContent" class="hidden fade-in">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-3xl font-bold text-gray-800">Manage Classes</h2>
+                        <p class="text-gray-600 mt-1">Create and manage class information</p>
+                    </div>
+                    <button id="addClassBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center transition shadow-lg">
+                        <i class="fas fa-plus mr-2"></i> Add Class
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subjects</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="classesTableBody">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Students Content -->
+            <div id="studentsContent" class="hidden fade-in">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-3xl font-bold text-gray-800">Manage Students</h2>
+                        <p class="text-gray-600 mt-1">Add and manage student information</p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button id="addStudentBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center transition shadow-lg">
+                            <i class="fas fa-plus mr-2"></i> Add Student
+                        </button>
+                        <button id="importStudentsBtn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg flex items-center transition shadow-lg">
+                            <i class="fas fa-file-import mr-2"></i> Import
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Filter by Class</label>
+                        <select id="filterClassSelect" class="w-full md:w-1/3 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                            <option value="">All Classes</option>
+                        </select>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roll No</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="studentsTableBody">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Content -->
+            <div id="reportsContent" class="hidden fade-in">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-3xl font-bold text-gray-800">Attendance Reports</h2>
+                        <p class="text-gray-600 mt-1">Generate and export attendance reports</p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button id="exportPDFBtn" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg flex items-center transition shadow-lg">
+                            <i class="fas fa-file-pdf mr-2"></i> Export PDF
+                        </button>
+                        <button id="exportExcelBtn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg flex items-center transition shadow-lg">
+                            <i class="fas fa-file-excel mr-2"></i> Export Excel
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Select Class</label>
+                            <select id="reportClassSelect" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                                <option value="">All Classes</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">From Date</label>
+                            <input type="date" id="fromDate" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">To Date</label>
+                            <input type="date" id="toDate" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                        </div>
+                        <div class="flex items-end">
+                            <button id="filterReportBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+                                <i class="fas fa-filter mr-2"></i> Apply Filters
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Present</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Absent</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="reportsTableBody">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Content -->
+            <div id="settingsContent" class="hidden fade-in">
+                <div class="mb-6">
+                    <h2 class="text-3xl font-bold text-gray-800">Settings</h2>
+                    <p class="text-gray-600 mt-1">Configure system preferences</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-xl font-semibold mb-6 text-gray-800">General Settings</h3>
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Institution Name</label>
+                                <input type="text" id="institutionName" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" placeholder="Enter institution name">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Default Time Zone</label>
+                                <select id="timeZoneSelect" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                                    <option value="UTC">UTC</option>
+                                    <option value="IST" selected>Indian Standard Time (IST)</option>
+                                    <option value="PST">Pacific Standard Time (PST)</option>
+                                    <option value="EST">Eastern Standard Time (EST)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="notificationsEnabled" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-offset-0 focus:ring-blue-200 focus:ring-opacity-50" checked>
+                                    <span class="ml-3 text-sm text-gray-700">Enable Email Notifications</span>
+                                </label>
+                            </div>
+                            <button id="saveSettingsBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition">
+                                <i class="fas fa-save mr-2"></i> Save Settings
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-xl font-semibold mb-6 text-gray-800">Data Management</h3>
+                        <div class="space-y-6">
+                            <div>
+                                <h4 class="text-lg font-medium text-gray-700 mb-3">Backup & Restore</h4>
+                                <div class="flex flex-col sm:flex-row gap-3">
+                                    <button id="backupDataBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center transition">
+                                        <i class="fas fa-download mr-2"></i> Backup Data
+                                    </button>
+                                    <button id="restoreDataBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center transition">
+                                        <i class="fas fa-upload mr-2"></i> Restore Data
+                                    </button>
+                                    <input type="file" id="restoreFileInput" class="hidden" accept=".json">
+                                </div>
+                            </div>
+
+                            <div class="pt-6 border-t border-gray-200">
+                                <h4 class="text-lg font-medium text-gray-700 mb-3">Reset Data</h4>
+                                <p class="text-sm text-gray-600 mb-4">Warning: This will permanently delete all attendance records, students, and classes.</p>
+                                <button id="resetDataBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center transition">
+                                    <i class="fas fa-trash-alt mr-2"></i> Reset All Data
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    
+    <!-- Add Class Modal -->
+    <div id="addClassModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden modal">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md m-4">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-semibold text-gray-800">Add New Class</h3>
+                    <button id="closeAddClassModal" class="text-gray-400 hover:text-gray-600 transition">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Class Name</label>
+                        <input type="text" id="newClassName" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" placeholder="e.g., Grade 10 - Section A">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Subjects (comma separated)</label>
+                        <input type="text" id="newClassSubjects" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" placeholder="e.g., Math, Science, English">
+                    </div>
+                </div>
+                <div class="mt-8 flex justify-end space-x-3">
+                    <button id="cancelAddClassBtn" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition">
+                        Cancel
+                    </button>
+                    <button id="confirmAddClassBtn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        Save Class
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Student Modal -->
+    <div id="addStudentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden modal">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md m-4">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-semibold text-gray-800">Add New Student</h3>
+                    <button id="closeAddStudentModal" class="text-gray-400 hover:text-gray-600 transition">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Roll Number</label>
+                        <input type="text" id="newStudentRollNo" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" placeholder="e.g., 2024001">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                        <input type="text" id="newStudentName" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" placeholder="e.g., John Doe">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Class</label>
+                        <select id="newStudentClass" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                            <option value="">-- Select Class --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                        <input type="email" id="newStudentEmail" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" placeholder="e.g., student@example.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                        <input type="tel" id="newStudentPhone" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" placeholder="e.g., +1234567890">
+                    </div>
+                </div>
+                <div class="mt-8 flex justify-end space-x-3">
+                    <button id="cancelAddStudentBtn" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition">
+                        Cancel
+                    </button>
+                    <button id="confirmAddStudentBtn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        Save Student
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Students Modal -->
+    <div id="importStudentsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden modal">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md m-4">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-semibold text-gray-800">Import Students</h3>
+                    <button id="closeImportStudentsModal" class="text-gray-400 hover:text-gray-600 transition">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Class</label>
+                        <select id="importClassSelect" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                            <option value="">-- Select Class --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Upload Excel File</label>
+                        <div class="mt-2 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition">
+                            <div class="space-y-2 text-center">
+                                <i class="fas fa-cloud-upload-alt text-4xl text-gray-400"></i>
+                                <div class="flex text-sm text-gray-600">
+                                    <label for="studentImportFile" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none transition">
+                                        <span>Upload a file</span>
+                                        <input id="studentImportFile" type="file" class="sr-only" accept=".xlsx,.xls,.csv">
+                                    </label>
+                                    <p class="pl-1">or drag and drop</p>
+                                </div>
+                                <p class="text-xs text-gray-500">Excel or CSV files up to 10MB</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <p class="text-xs text-blue-800 mb-2">File should have columns: Roll No, Name, Email, Phone</p>
+                        <a href="#" id="downloadSampleBtn" class="text-xs text-blue-600 hover:underline transition">Download sample file</a>
+                    </div>
+                </div>
+                <div class="mt-8 flex justify-end space-x-3">
+                    <button id="cancelImportStudentsBtn" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition">
+                        Cancel
+                    </button>
+                    <button id="confirmImportStudentsBtn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        Import Students
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmationModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden modal">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md m-4">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-semibold text-gray-800" id="confirmationTitle">Confirm Action</h3>
+                    <button id="closeConfirmationModal" class="text-gray-400 hover:text-gray-600 transition">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <p class="text-gray-700 mb-6" id="confirmationMessage">Are you sure you want to perform this action?</p>
+                <div class="flex justify-end space-x-3">
+                    <button id="cancelConfirmationBtn" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition">
+                        Cancel
+                    </button>
+                    <button id="confirmActionBtn" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications -->
+    <div id="successNotification" class="notification fixed top-4 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center transform translate-x-full z-50">
+        <i class="fas fa-check-circle mr-3 text-xl"></i>
+        <span id="successMessage">Operation completed successfully!</span>
+    </div>
+
+    <div id="errorNotification" class="notification fixed top-4 right-4 bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center transform translate-x-full z-50">
+        <i class="fas fa-exclamation-circle mr-3 text-xl"></i>
+        <span id="errorMessage">An error occurred!</span>
+    </div>
+
+    <script>
+        // Application State
+        let appData = {
+            classes: [],
+            students: [],
+            attendance: [],
+            settings: {
+                institutionName: "Demo Educational Institute",
+                timeZone: "IST",
+                notificationsEnabled: true
+            }
+        };
+
+        let attendanceChart = null;
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            loadDataFromStorage();
+            setCurrentDate();
+            initializeNavigation();
+            initializeModals();
+            initializeDashboard();
+            initializeQuickActions();
+            
+            // Default to dashboard
+            showSection('dashboard');
+        }
+
+        // Data Management
+        function loadDataFromStorage() {
+            const savedData = localStorage.getItem('attendanceSystemData');
+            if (savedData) {
+                appData = JSON.parse(savedData);
+            } else {
+                // Initialize with sample data
+                initializeSampleData();
+            }
+        }
+
+        function saveDataToStorage() {
+            localStorage.setItem('attendanceSystemData', JSON.stringify(appData));
+        }
+
+        function initializeSampleData() {
+            appData.classes = [
+                { id: 1, name: "Grade 10 - Section A", subjects: ["Mathematics", "Physics", "Chemistry", "English"] },
+                { id: 2, name: "Grade 10 - Section B", subjects: ["Mathematics", "Biology", "Chemistry", "English"] },
+                { id: 3, name: "Grade 11 - Science", subjects: ["Advanced Math", "Physics", "Chemistry", "Biology"] }
+            ];
+
+            appData.students = [
+                { id: 1, rollNo: "2024001", name: "Alice Johnson", classId: 1, email: "alice@example.com", phone: "+1234567890" },
+                { id: 2, rollNo: "2024002", name: "Bob Smith", classId: 1, email: "bob@example.com", phone: "+1234567891" },
+                { id: 3, rollNo: "2024003", name: "Carol Davis", classId: 1, email: "carol@example.com", phone: "+1234567892" },
+                { id: 4, rollNo: "2024004", name: "David Wilson", classId: 2, email: "david@example.com", phone: "+1234567893" },
+                { id: 5, rollNo: "2024005", name: "Eva Brown", classId: 2, email: "eva@example.com", phone: "+1234567894" },
+                { id: 6, rollNo: "2024006", name: "Frank Miller", classId: 3, email: "frank@example.com", phone: "+1234567895" }
+            ];
+
+            // Generate sample attendance data
+            const today = new Date();
+            const dates = [];
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(today);
+                date.setDate(date.getDate() - i);
+                dates.push(formatDate(date));
+            }
+
+            appData.attendance = [];
+            let id = 1;
+
+            dates.forEach(date => {
+                appData.classes.forEach(classObj => {
+                    const subject = classObj.subjects[Math.floor(Math.random() * classObj.subjects.length)];
+                    const classStudents = appData.students.filter(s => s.classId === classObj.id);
+                    
+                    const records = classStudents.map(student => ({
+                        studentId: student.id,
+                        status: Math.random() > 0.2 ? 'present' : 'absent' // 80% attendance rate
+                    }));
+
+                    appData.attendance.push({
+                        id: id++,
+                        classId: classObj.id,
+                        date: date,
+                        subject: subject,
+                        records: records
+                    });
+                });
+            });
+
+            saveDataToStorage();
+        }
+
+        // Utility Functions
+        function formatDate(date, withDay = false) {
+            const d = new Date(date);
+            const options = withDay ? 
+                { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' } :
+                { year: 'numeric', month: '2-digit', day: '2-digit' };
+            
+            if (withDay) {
+                return d.toLocaleDateString('en-US', options);
+            } else {
+                return d.toISOString().split('T')[0];
+            }
+        }
+
+        function setCurrentDate() {
+            const currentDate = new Date();
+            document.getElementById('currentDate').textContent = formatDate(currentDate, true);
+            document.getElementById('attendanceDate').value = formatDate(currentDate);
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById(`${type}Notification`);
+            const messageElement = document.getElementById(`${type}Message`);
+            
+            messageElement.textContent = message;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 4000);
+        }
+
+        function showSection(sectionName) {
+            // Hide all sections
+            document.querySelectorAll('[id$="Content"]').forEach(section => {
+                section.classList.add('hidden');
+            });
+            
+            // Remove active class from all nav links
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active', 'bg-blue-700');
+            });
+            
+            // Show selected section
+            const targetSection = document.getElementById(`${sectionName}Content`);
+            if (targetSection) {
+                targetSection.classList.remove('hidden');
+            }
+            
+            // Add active class to clicked nav link
+            const targetLink = document.getElementById(`${sectionName}Link`);
+            if (targetLink) {
+                targetLink.classList.add('active', 'bg-blue-700');
+            }
+            
+            // Close mobile menu
+            document.getElementById('sidebar').classList.remove('active');
+            
+            // Initialize section-specific functionality
+            switch(sectionName) {
+                case 'attendance':
+                    initializeAttendanceSection();
+                    break;
+                case 'classes':
+                    initializeClassesSection();
+                    break;
+                case 'students':
+                    initializeStudentsSection();
+                    break;
+                case 'reports':
+                    initializeReportsSection();
+                    break;
+                case 'settings':
+                    initializeSettingsSection();
+                    break;
+                case 'dashboard':
+                    initializeDashboard();
+                    break;
+            }
+        }
+
+        // Navigation
+        function initializeNavigation() {
+            // Mobile menu toggle
+            document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+                document.getElementById('sidebar').classList.add('active');
+            });
+
+            document.getElementById('closeMenuBtn').addEventListener('click', () => {
+                document.getElementById('sidebar').classList.remove('active');
+            });
+
+            // Navigation links
+            const navLinks = ['dashboard', 'attendance', 'classes', 'students', 'reports', 'settings'];
+            navLinks.forEach(link => {
+                document.getElementById(`${link}Link`).addEventListener('click', (e) => {
+                    e.preventDefault();
+                    showSection(link);
+                });
+            });
+
+            // Close sidebar when clicking outside on mobile
+            document.addEventListener('click', (e) => {
+                const sidebar = document.getElementById('sidebar');
+                const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+                
+                if (window.innerWidth < 768 && 
+                    !sidebar.contains(e.target) && 
+                    !mobileMenuBtn.contains(e.target) && 
+                    sidebar.classList.contains('active')) {
+                    sidebar.classList.remove('active');
+                }
+            });
+        }
+
+        // Quick Actions
+        function initializeQuickActions() {
+            document.getElementById('quickAttendance').addEventListener('click', () => {
+                showSection('attendance');
+            });
+
+            document.getElementById('quickAddStudent').addEventListener('click', () => {
+                showSection('students');
+                setTimeout(() => {
+                    document.getElementById('addStudentBtn').click();
+                }, 100);
+            });
+
+            document.getElementById('quickReport').addEventListener('click', () => {
+                showSection('reports');
+            });
+        }
+
+        // Dashboard
+        function initializeDashboard() {
+            updateDashboardStats();
+            updateRecentAttendanceTable();
+            initializeAttendanceChart();
+        }
+
+        function updateDashboardStats() {
+            const today = formatDate(new Date());
+            const todayAttendance = appData.attendance.filter(a => a.date === today);
+            
+            document.getElementById('todayAttendanceCount').textContent = todayAttendance.length;
+            document.getElementById('totalClassesCount').textContent = appData.classes.length;
+            document.getElementById('totalStudentsCount').textContent = appData.students.length;
+            
+            // Monthly count (last 30 days)
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            const monthlyCount = appData.attendance.filter(a => 
+                new Date(a.date) >= thirtyDaysAgo
+            ).length;
+            
+            document.getElementById('monthlyAttendanceCount').textContent = monthlyCount;
+        }
+
+        function updateRecentAttendanceTable() {
+            const tableBody = document.getElementById('recentAttendanceTable');
+            tableBody.innerHTML = '';
+            
+            const recentAttendance = [...appData.attendance]
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .slice(0, 5);
+            
+            if (recentAttendance.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-4 py-8 text-center text-gray-500">
+                            No recent attendance records found
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            recentAttendance.forEach(record => {
+                const classObj = appData.classes.find(c => c.id === record.classId);
+                const presentCount = record.records.filter(r => r.status === 'present').length;
+                const totalCount = record.records.length;
+                const percentage = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
+                
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition';
+                row.innerHTML = `
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${record.date}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${classObj ? classObj.name : 'Unknown'}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${presentCount}/${totalCount}</td>
+                    <td class="px-4 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            percentage >= 80 ? 'bg-green-100 text-green-800' :
+                            percentage >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                        }">
+                            ${percentage}%
+                        </span>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        function initializeAttendanceChart() {
+            const ctx = document.getElementById('attendanceChart');
+            if (!ctx) return;
+
+            // Destroy existing chart if it exists
+            if (attendanceChart) {
+                attendanceChart.destroy();
+            }
+
+            const chartData = appData.classes.map(classObj => {
+                const classAttendance = appData.attendance.filter(a => a.classId === classObj.id);
+                
+                if (classAttendance.length === 0) return { name: classObj.name, percentage: 0 };
+                
+                let totalPresent = 0;
+                let totalStudents = 0;
+                
+                classAttendance.forEach(att => {
+                    totalPresent += att.records.filter(r => r.status === 'present').length;
+                    totalStudents += att.records.length;
+                });
+                
+                const percentage = totalStudents > 0 ? Math.round((totalPresent / totalStudents) * 100) : 0;
+                
+                return { name: classObj.name, percentage };
+            });
+
+            attendanceChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: chartData.map(d => d.name),
+                    datasets: [{
+                        data: chartData.map(d => d.percentage),
+                        backgroundColor: [
+                            '#3B82F6',
+                            '#10B981',
+                            '#8B5CF6',
+                            '#F59E0B',
+                            '#EF4444'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                usePointStyle: true
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Attendance Section
+        function initializeAttendanceSection() {
+            populateClassSelects();
+            setupAttendanceEventListeners();
+        }
+
+        function populateClassSelects() {
+            const selects = ['classSelect', 'newStudentClass', 'importClassSelect', 'filterClassSelect', 'reportClassSelect'];
+            
+            selects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                if (!select) return;
+                
+                const currentValue = select.value;
+                const isFilter = selectId.includes('filter') || selectId.includes('report');
+                
+                select.innerHTML = isFilter ? '<option value="">All Classes</option>' : '<option value="">-- Select Class --</option>';
+                
+                appData.classes.forEach(classObj => {
+                    const option = document.createElement('option');
+                    option.value = classObj.id;
+                    option.textContent = classObj.name;
+                    if (currentValue == classObj.id) option.selected = true;
+                    select.appendChild(option);
+                });
+            });
+        }
+
+        function setupAttendanceEventListeners() {
+            const classSelect = document.getElementById('classSelect');
+            const subjectSelect = document.getElementById('subjectSelect');
+            const attendanceDate = document.getElementById('attendanceDate');
+
+            // Class selection handler
+            classSelect.addEventListener('change', function() {
+                const classId = parseInt(this.value);
+                populateSubjects(classId);
+                populateAttendanceTable(classId);
+            });
+
+            // Subject selection handler
+            subjectSelect.addEventListener('change', function() {
+                loadExistingAttendance();
+            });
+
+            // Date change handler
+            attendanceDate.addEventListener('change', function() {
+                loadExistingAttendance();
+            });
+
+            // Mark all buttons
+            document.getElementById('markAllPresentBtn').addEventListener('click', () => {
+                setAllAttendance(true);
+            });
+
+            document.getElementById('markAllAbsentBtn').addEventListener('click', () => {
+                setAllAttendance(false);
+            });
+
+            // Save and print buttons
+            document.getElementById('saveAttendanceBtn').addEventListener('click', saveAttendance);
+            document.getElementById('printAttendanceBtn').addEventListener('click', printAttendance);
+        }
+
+        function populateSubjects(classId) {
+            const subjectSelect = document.getElementById('subjectSelect');
+            subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
+            
+            if (!classId) return;
+            
+            const classObj = appData.classes.find(c => c.id === classId);
+            if (!classObj) return;
+            
+            classObj.subjects.forEach(subject => {
+                const option = document.createElement('option');
+                option.value = subject;
+                option.textContent = subject;
+                subjectSelect.appendChild(option);
+            });
+        }
+
+        function populateAttendanceTable(classId) {
+            const tableBody = document.getElementById('attendanceTableBody');
+            tableBody.innerHTML = '';
+            
+            if (!classId) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-6 py-8 text-center text-gray-500">
+                            <i class="fas fa-users text-4xl text-gray-300 mb-3"></i>
+                            <p>Please select a class to view students</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            const students = appData.students.filter(s => s.classId === classId);
+            
+            if (students.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-6 py-8 text-center text-gray-500">
+                            <i class="fas fa-user-plus text-4xl text-gray-300 mb-3"></i>
+                            <p>No students found in this class</p>
+                            <button class="mt-2 text-blue-600 hover:text-blue-800 text-sm" onclick="showSection('students')">
+                                Add students to this class
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            students.forEach(student => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition';
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student.rollNo}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${student.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="status-badge px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                            Absent
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="checkbox" data-student-id="${student.id}" class="attendance-checkbox rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            <span class="ml-2 text-sm text-gray-700 select-none">Present</span>
+                        </label>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+            
+            // Add event listeners to checkboxes
+            document.querySelectorAll('.attendance-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const statusBadge = this.closest('tr').querySelector('.status-badge');
+                    if (this.checked) {
+                        statusBadge.textContent = 'Present';
+                        statusBadge.className = 'status-badge px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800';
+                    } else {
+                        statusBadge.textContent = 'Absent';
+                        statusBadge.className = 'status-badge px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800';
+                    }
+                });
+            });
+        }
+
+        function loadExistingAttendance() {
+            const classId = parseInt(document.getElementById('classSelect').value);
+            const date = document.getElementById('attendanceDate').value;
+            const subject = document.getElementById('subjectSelect').value;
+            
+            if (!classId || !date || !subject) return;
+            
+            const existingRecord = appData.attendance.find(a => 
+                a.classId === classId && 
+                a.date === date && 
+                a.subject === subject
+            );
+            
+            if (existingRecord) {
+                document.querySelectorAll('.attendance-checkbox').forEach(checkbox => {
+                    const studentId = parseInt(checkbox.dataset.studentId);
+                    const record = existingRecord.records.find(r => r.studentId === studentId);
+                    checkbox.checked = record ? record.status === 'present' : false;
+                    checkbox.dispatchEvent(new Event('change'));
+                });
+                
+                showNotification('Loaded existing attendance record', 'success');
+            }
+        }
+
+        function setAllAttendance(isPresent) {
+            document.querySelectorAll('.attendance-checkbox').forEach(checkbox => {
+                checkbox.checked = isPresent;
+                checkbox.dispatchEvent(new Event('change'));
+            });
+        }
+
+        function saveAttendance() {
+            const classId = parseInt(document.getElementById('classSelect').value);
+            const date = document.getElementById('attendanceDate').value;
+            const subject = document.getElementById('subjectSelect').value;
+            
+            if (!classId || !date || !subject) {
+                showNotification('Please select class, date and subject', 'error');
+                return;
+            }
+            
+            const checkboxes = document.querySelectorAll('.attendance-checkbox');
+            if (checkboxes.length === 0) {
+                showNotification('No students found for this class', 'error');
+                return;
+            }
+            
+            const records = [];
+            checkboxes.forEach(checkbox => {
+                records.push({
+                    studentId: parseInt(checkbox.dataset.studentId),
+                    status: checkbox.checked ? 'present' : 'absent'
+                });
+            });
+            
+            // Check if attendance already exists
+            const existingIndex = appData.attendance.findIndex(a => 
+                a.classId === classId && 
+                a.date === date && 
+                a.subject === subject
+            );
+            
+            if (existingIndex >= 0) {
+                // Update existing record
+                appData.attendance[existingIndex].records = records;
+            } else {
+                // Add new record
+                const newId = appData.attendance.length > 0 ? 
+                    Math.max(...appData.attendance.map(a => a.id)) + 1 : 1;
+                
+                appData.attendance.push({
+                    id: newId,
+                    classId,
+                    date,
+                    subject,
+                    records
+                });
+            }
+            
+            saveDataToStorage();
+            showNotification('Attendance saved successfully', 'success');
+            initializeDashboard(); // Refresh dashboard
+        }
+
+        function printAttendance() {
+            const classId = parseInt(document.getElementById('classSelect').value);
+            const date = document.getElementById('attendanceDate').value;
+            const subject = document.getElementById('subjectSelect').value;
+            
+            if (!classId || !date || !subject) {
+                showNotification('Please select class, date and subject', 'error');
+                return;
+            }
+            
+            const classObj = appData.classes.find(c => c.id === classId);
+            const students = appData.students.filter(s => s.classId === classId);
+            
+            if (students.length === 0) {
+                showNotification('No students found in this class', 'error');
+                return;
+            }
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Header
+            doc.setFontSize(20);
+            doc.text('Attendance Report', 105, 20, { align: 'center' });
+            
+            doc.setFontSize(12);
+            doc.text(`Class: ${classObj.name}`, 20, 35);
+            doc.text(`Subject: ${subject}`, 20, 45);
+            doc.text(`Date: ${date}`, 20, 55);
+            doc.text(`Institution: ${appData.settings.institutionName}`, 20, 65);
+            
+            // Attendance table
+            const tableData = students.map(student => {
+                const checkbox = document.querySelector(`input[data-student-id="${student.id}"]`);
+                const status = checkbox && checkbox.checked ? 'Present' : 'Absent';
+                return [student.rollNo, student.name, status];
+            });
+            
+            doc.autoTable({
+                head: [['Roll No', 'Name', 'Status']],
+                body: tableData,
+                startY: 75,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [59, 130, 246],
+                    textColor: 255
+                },
+                styles: {
+                    fontSize: 10
+                }
+            });
+            
+            // Summary
+            const presentCount = students.filter(student => {
+                const checkbox = document.querySelector(`input[data-student-id="${student.id}"]`);
+                return checkbox && checkbox.checked;
+            }).length;
+            
+            const finalY = doc.lastAutoTable.finalY + 20;
+            doc.setFontSize(12);
+            doc.text(`Total Students: ${students.length}`, 20, finalY);
+            doc.text(`Present: ${presentCount}`, 20, finalY + 10);
+            doc.text(`Absent: ${students.length - presentCount}`, 20, finalY + 20);
+            doc.text(`Attendance Rate: ${Math.round((presentCount / students.length) * 100)}%`, 20, finalY + 30);
+            
+            doc.save(`Attendance_${classObj.name.replace(/\s+/g, '_')}_${date}.pdf`);
+            showNotification('PDF generated successfully', 'success');
+        }
+
+        // Classes Section
+        function initializeClassesSection() {
+            populateClassesTable();
+        }
+
+        function populateClassesTable() {
+            const tableBody = document.getElementById('classesTableBody');
+            tableBody.innerHTML = '';
+            
+            if (appData.classes.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                            <i class="fas fa-chalkboard-teacher text-4xl text-gray-300 mb-3"></i>
+                            <p>No classes found. Create your first class!</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            appData.classes.forEach(classObj => {
+                const studentCount = appData.students.filter(s => s.classId === classObj.id).length;
+                
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition';
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${classObj.id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${classObj.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                            ${studentCount} students
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900 max-w-xs">
+                        <div class="flex flex-wrap gap-1">
+                            ${classObj.subjects.map(subject => 
+                                `<span class="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded">${subject}</span>`
+                            ).join('')}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <button class="text-blue-600 hover:text-blue-900 mr-3 p-1" onclick="editClass(${classObj.id})" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="text-red-600 hover:text-red-900 p-1" onclick="confirmDeleteClass(${classObj.id})" title="Delete">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        function editClass(classId) {
+            const classObj = appData.classes.find(c => c.id === classId);
+            if (!classObj) return;
+            
+            document.getElementById('newClassName').value = classObj.name;
+            document.getElementById('newClassSubjects').value = classObj.subjects.join(', ');
+            
+            const modal = document.getElementById('addClassModal');
+            modal.dataset.editingId = classId;
+            modal.classList.remove('hidden');
+            
+            setTimeout(() => modal.classList.add('show'), 10);
+        }
+
+        function confirmDeleteClass(classId) {
+            const classObj = appData.classes.find(c => c.id === classId);
+            if (!classObj) return;
+            
+            const studentsCount = appData.students.filter(s => s.classId === classId).length;
+            
+            if (studentsCount > 0) {
+                showNotification(`Cannot delete class with ${studentsCount} students. Please remove students first.`, 'error');
+                return;
+            }
+            
+            showConfirmationModal(
+                'Delete Class',
+                `Are you sure you want to delete "${classObj.name}"? This action cannot be undone.`,
+                () => deleteClass(classId)
+            );
+        }
+
+        function deleteClass(classId) {
+            appData.classes = appData.classes.filter(c => c.id !== classId);
+            appData.attendance = appData.attendance.filter(a => a.classId !== classId);
+            
+            saveDataToStorage();
+            populateClassesTable();
+            populateClassSelects();
+            initializeDashboard();
+            showNotification('Class deleted successfully', 'success');
+        }
+
+        // Students Section
+        function initializeStudentsSection() {
+            populateStudentsTable();
+            
+            // Filter event listener
+            document.getElementById('filterClassSelect').addEventListener('change', function() {
+                const classId = this.value ? parseInt(this.value) : null;
+                populateStudentsTable(classId);
+            });
+        }
+
+        function populateStudentsTable(filterClassId = null) {
+            const tableBody = document.getElementById('studentsTableBody');
+            tableBody.innerHTML = '';
+            
+            let students = [...appData.students];
+            if (filterClassId) {
+                students = students.filter(s => s.classId === filterClassId);
+            }
+            
+            if (students.length === 0) {
+                const message = filterClassId ? 
+                    'No students found in the selected class' : 
+                    'No students found. Add your first student!';
+                    
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                            <i class="fas fa-user-plus text-4xl text-gray-300 mb-3"></i>
+                            <p>${message}</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            students.forEach(student => {
+                const classObj = appData.classes.find(c => c.id === student.classId);
+                
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition';
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student.rollNo}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${student.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                            ${classObj ? classObj.name : 'Unknown Class'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <div>
+                            <div class="text-sm text-gray-900">${student.phone || 'N/A'}</div>
+                            <div class="text-sm text-gray-500">${student.email || 'N/A'}</div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <button class="text-blue-600 hover:text-blue-900 mr-3 p-1" onclick="editStudent(${student.id})" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="text-red-600 hover:text-red-900 p-1" onclick="confirmDeleteStudent(${student.id})" title="Delete">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        function editStudent(studentId) {
+            const student = appData.students.find(s => s.id === studentId);
+            if (!student) return;
+            
+            document.getElementById('newStudentRollNo').value = student.rollNo;
+            document.getElementById('newStudentName').value = student.name;
+            document.getElementById('newStudentEmail').value = student.email || '';
+            document.getElementById('newStudentPhone').value = student.phone || '';
+            
+            // Populate and select class
+            populateClassSelects();
+            document.getElementById('newStudentClass').value = student.classId;
+            
+            const modal = document.getElementById('addStudentModal');
+            modal.dataset.editingId = studentId;
+            modal.classList.remove('hidden');
+            
+            setTimeout(() => modal.classList.add('show'), 10);
+        }
+
+        function confirmDeleteStudent(studentId) {
+            const student = appData.students.find(s => s.id === studentId);
+            if (!student) return;
+            
+            showConfirmationModal(
+                'Delete Student',
+                `Are you sure you want to delete "${student.name}" (${student.rollNo})? This action cannot be undone.`,
+                () => deleteStudent(studentId)
+            );
+        }
+
+        function deleteStudent(studentId) {
+            appData.students = appData.students.filter(s => s.id !== studentId);
+            
+            // Remove student from attendance records
+            appData.attendance.forEach(att => {
+                att.records = att.records.filter(r => r.studentId !== studentId);
+            });
+            
+            saveDataToStorage();
+            populateStudentsTable();
+            initializeDashboard();
+            showNotification('Student deleted successfully', 'success');
+        }
+
+        // Reports Section
+        function initializeReportsSection() {
+            populateClassSelects();
+            setDefaultDateRange();
+            generateReport();
+            
+            document.getElementById('filterReportBtn').addEventListener('click', generateReport);
+            document.getElementById('exportPDFBtn').addEventListener('click', exportReportPDF);
+            document.getElementById('exportExcelBtn').addEventListener('click', exportReportExcel);
+        }
+
+        function setDefaultDateRange() {
+            const today = new Date();
+            const thirtyDaysAgo = new Date(today);
+            thirtyDaysAgo.setDate(today.getDate() - 30);
+            
+            document.getElementById('fromDate').value = formatDate(thirtyDaysAgo);
+            document.getElementById('toDate').value = formatDate(today);
+        }
+
+        function generateReport() {
+            const classId = document.getElementById('reportClassSelect').value ? 
+                parseInt(document.getElementById('reportClassSelect').value) : null;
+            const fromDate = document.getElementById('fromDate').value;
+            const toDate = document.getElementById('toDate').value;
+            
+            if (!fromDate || !toDate) {
+                showNotification('Please select date range', 'error');
+                return;
+            }
+            
+            let filteredAttendance = [...appData.attendance];
+            
+            // Filter by class
+            if (classId) {
+                filteredAttendance = filteredAttendance.filter(a => a.classId === classId);
+            }
+            
+            // Filter by date range
+            filteredAttendance = filteredAttendance.filter(a => 
+                a.date >= fromDate && a.date <= toDate
+            );
+            
+            // Sort by date (newest first)
+            filteredAttendance.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            populateReportsTable(filteredAttendance);
+        }
+
+        function populateReportsTable(attendanceData) {
+            const tableBody = document.getElementById('reportsTableBody');
+            tableBody.innerHTML = '';
+            
+            if (attendanceData.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                            <i class="fas fa-file-alt text-4xl text-gray-300 mb-3"></i>
+                            <p>No attendance records found for the selected criteria</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            attendanceData.forEach(record => {
+                const classObj = appData.classes.find(c => c.id === record.classId);
+                const presentCount = record.records.filter(r => r.status === 'present').length;
+                const absentCount = record.records.length - presentCount;
+                const percentage = record.records.length > 0 ? 
+                    Math.round((presentCount / record.records.length) * 100) : 0;
+                
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition';
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.date}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${classObj ? classObj.name : 'Unknown'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.subject}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">${presentCount}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">${absentCount}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full ${
+                            percentage >= 80 ? 'bg-green-100 text-green-800' :
+                            percentage >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                        }">
+                            ${percentage}%
+                        </span>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        function exportReportPDF() {
+            const attendanceData = getCurrentReportData();
+            
+            if (attendanceData.length === 0) {
+                showNotification('No data to export', 'error');
+                return;
+            }
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Header
+            doc.setFontSize(18);
+            doc.text('Attendance Report', 105, 20, { align: 'center' });
+            
+            doc.setFontSize(12);
+            const fromDate = document.getElementById('fromDate').value;
+            const toDate = document.getElementById('toDate').value;
+            const classId = document.getElementById('reportClassSelect').value;
+            const className = classId ? 
+                appData.classes.find(c => c.id == classId)?.name || 'Unknown' : 
+                'All Classes';
+            
+            doc.text(`Period: ${fromDate} to ${toDate}`, 20, 35);
+            doc.text(`Class: ${className}`, 20, 45);
+            doc.text(`Institution: ${appData.settings.institutionName}`, 20, 55);
+            
+            // Table data
+            const tableData = attendanceData.map(record => {
+                const classObj = appData.classes.find(c => c.id === record.classId);
+                const presentCount = record.records.filter(r => r.status === 'present').length;
+                const absentCount = record.records.length - presentCount;
+                const percentage = record.records.length > 0 ? 
+                    Math.round((presentCount / record.records.length) * 100) : 0;
+                
+                return [
+                    record.date,
+                    classObj ? classObj.name : 'Unknown',
+                    record.subject,
+                    presentCount,
+                    absentCount,
+                    `${percentage}%`
+                ];
+            });
+            
+            doc.autoTable({
+                head: [['Date', 'Class', 'Subject', 'Present', 'Absent', 'Rate']],
+                body: tableData,
+                startY: 65,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [59, 130, 246],
+                    textColor: 255
+                },
+                styles: {
+                    fontSize: 9
+                }
+            });
+            
+            doc.save(`Attendance_Report_${fromDate}_to_${toDate}.pdf`);
+            showNotification('PDF report exported successfully', 'success');
+        }
+
+        function exportReportExcel() {
+            const attendanceData = getCurrentReportData();
+            
+            if (attendanceData.length === 0) {
+                showNotification('No data to export', 'error');
+                return;
+            }
+            
+            const excelData = attendanceData.map(record => {
+                const classObj = appData.classes.find(c => c.id === record.classId);
+                const presentCount = record.records.filter(r => r.status === 'present').length;
+                const absentCount = record.records.length - presentCount;
+                const percentage = record.records.length > 0 ? 
+                    Math.round((presentCount / record.records.length) * 100) : 0;
+                
+                return {
+                    'Date': record.date,
+                    'Class': classObj ? classObj.name : 'Unknown',
+                    'Subject': record.subject,
+                    'Present': presentCount,
+                    'Absent': absentCount,
+                    'Total': record.records.length,
+                    'Attendance Rate (%)': percentage
+                };
+            });
+            
+            const ws = XLSX.utils.json_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Attendance Report');
+            
+            const fromDate = document.getElementById('fromDate').value;
+            const toDate = document.getElementById('toDate').value;
+            XLSX.writeFile(wb, `Attendance_Report_${fromDate}_to_${toDate}.xlsx`);
+            
+            showNotification('Excel report exported successfully', 'success');
+        }
+
+        function getCurrentReportData() {
+            const classId = document.getElementById('reportClassSelect').value ? 
+                parseInt(document.getElementById('reportClassSelect').value) : null;
+            const fromDate = document.getElementById('fromDate').value;
+            const toDate = document.getElementById('toDate').value;
+            
+            let filteredAttendance = [...appData.attendance];
+            
+            if (classId) {
+                filteredAttendance = filteredAttendance.filter(a => a.classId === classId);
+            }
+            
+            filteredAttendance = filteredAttendance.filter(a => 
+                a.date >= fromDate && a.date <= toDate
+            );
+            
+            return filteredAttendance.sort((a, b) => new Date(b.date) - new Date(a.date));
+        }
+
+        // Settings Section
+        function initializeSettingsSection() {
+            loadSettings();
+            
+            document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+            document.getElementById('backupDataBtn').addEventListener('click', backupData);
+            document.getElementById('restoreDataBtn').addEventListener('click', () => {
+                document.getElementById('restoreFileInput').click();
+            });
+            document.getElementById('restoreFileInput').addEventListener('change', restoreData);
+            document.getElementById('resetDataBtn').addEventListener('click', confirmResetData);
+        }
+
+        function loadSettings() {
+            document.getElementById('institutionName').value = appData.settings.institutionName;
+            document.getElementById('timeZoneSelect').value = appData.settings.timeZone;
+            document.getElementById('notificationsEnabled').checked = appData.settings.notificationsEnabled;
+        }
+
+        function saveSettings() {
+            appData.settings.institutionName = document.getElementById('institutionName').value;
+            appData.settings.timeZone = document.getElementById('timeZoneSelect').value;
+            appData.settings.notificationsEnabled = document.getElementById('notificationsEnabled').checked;
+            
+            saveDataToStorage();
+            showNotification('Settings saved successfully', 'success');
+        }
+
+        function backupData() {
+            const dataStr = JSON.stringify(appData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `attendance_backup_${formatDate(new Date())}.json`;
+            link.click();
+            
+            showNotification('Data backup created successfully', 'success');
+        }
+
+        function restoreData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const restoredData = JSON.parse(e.target.result);
+                    
+                    // Validate data structure
+                    if (!restoredData.classes || !restoredData.students || !restoredData.attendance) {
+                        throw new Error('Invalid backup file format');
+                    }
+                    
+                    appData = restoredData;
+                    saveDataToStorage();
+                    
+                    // Refresh all sections
+                    initializeDashboard();
+                    populateClassSelects();
+                    
+                    showNotification('Data restored successfully', 'success');
+                    
+                    // Reload the page to ensure everything is updated
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                    
+                } catch (error) {
+                    showNotification('Error restoring data: Invalid file format', 'error');
+                }
+            };
+            
+            reader.readAsText(file);
+        }
+
+        function confirmResetData() {
+            showConfirmationModal(
+                'Reset All Data',
+                'This will permanently delete ALL attendance records, students, and classes. This action cannot be undone. Are you absolutely sure?',
+                resetAllData
+            );
+        }
+
+        function resetAllData() {
+            appData = {
+                classes: [],
+                students: [],
+                attendance: [],
+                settings: {
+                    institutionName: "Demo Educational Institute",
+                    timeZone: "IST",
+                    notificationsEnabled: true
+                }
+            };
+            
+            saveDataToStorage();
+            showNotification('All data has been reset', 'success');
+            
+            // Reload the page
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        }
+
+        // Modal Management
+        function initializeModals() {
+            // Add Class Modal
+            initializeModal('addClassModal', 'addClassBtn', 'closeAddClassModal', 'cancelAddClassBtn');
+            document.getElementById('confirmAddClassBtn').addEventListener('click', saveClass);
+            
+            // Add Student Modal
+            initializeModal('addStudentModal', 'addStudentBtn', 'closeAddStudentModal', 'cancelAddStudentBtn');
+            document.getElementById('confirmAddStudentBtn').addEventListener('click', saveStudent);
+            
+            // Import Students Modal
+            initializeModal('importStudentsModal', 'importStudentsBtn', 'closeImportStudentsModal', 'cancelImportStudentsBtn');
+            document.getElementById('confirmImportStudentsBtn').addEventListener('click', importStudents);
+            document.getElementById('downloadSampleBtn').addEventListener('click', downloadSampleFile);
+            
+            // Confirmation Modal
+            initializeModal('confirmationModal', null, 'closeConfirmationModal', 'cancelConfirmationBtn');
+        }
+
+        function initializeModal(modalId, openBtnId, closeBtnId, cancelBtnId) {
+            const modal = document.getElementById(modalId);
+            const openBtn = openBtnId ? document.getElementById(openBtnId) : null;
+            const closeBtn = document.getElementById(closeBtnId);
+            const cancelBtn = document.getElementById(cancelBtnId);
+            
+            if (openBtn) {
+                openBtn.addEventListener('click', () => {
+                    // Reset editing state
+                    delete modal.dataset.editingId;
+                    modal.classList.remove('hidden');
+                    setTimeout(() => modal.classList.add('show'), 10);
+                });
+            }
+            
+            const closeModal = () => {
+                modal.classList.remove('show');
+                setTimeout(() => modal.classList.add('hidden'), 300);
+            };
+            
+            closeBtn.addEventListener('click', closeModal);
+            cancelBtn.addEventListener('click', closeModal);
+            
+            // Close on outside click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeModal();
+            });
+        }
+
+        function showConfirmationModal(title, message, onConfirm) {
+            document.getElementById('confirmationTitle').textContent = title;
+            document.getElementById('confirmationMessage').textContent = message;
+            
+            const confirmBtn = document.getElementById('confirmActionBtn');
+            
+            // Remove existing event listeners
+            const newConfirmBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+            
+            newConfirmBtn.addEventListener('click', () => {
+                onConfirm();
+                document.getElementById('confirmationModal').classList.remove('show');
+                setTimeout(() => document.getElementById('confirmationModal').classList.add('hidden'), 300);
+            });
+            
+            const modal = document.getElementById('confirmationModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.add('show'), 10);
+        }
+
+        function saveClass() {
+            const name = document.getElementById('newClassName').value.trim();
+            const subjects = document.getElementById('newClassSubjects').value.trim();
+            
+            if (!name || !subjects) {
+                showNotification('Please fill in all fields', 'error');
+                return;
+            }
+            
+            const subjectsArray = subjects.split(',').map(s => s.trim()).filter(s => s.length > 0);
+            if (subjectsArray.length === 0) {
+                showNotification('Please enter at least one subject', 'error');
+                return;
+            }
+            
+            const modal = document.getElementById('addClassModal');
+            const editingId = modal.dataset.editingId;
+            
+            if (editingId) {
+                // Update existing class
+                const classObj = appData.classes.find(c => c.id == editingId);
+                if (classObj) {
+                    classObj.name = name;
+                    classObj.subjects = subjectsArray;
+                }
+                showNotification('Class updated successfully', 'success');
+            } else {
+                // Add new class
+                const newId = appData.classes.length > 0 ? 
+                    Math.max(...appData.classes.map(c => c.id)) + 1 : 1;
+                
+                appData.classes.push({
+                    id: newId,
+                    name: name,
+                    subjects: subjectsArray
+                });
+                showNotification('Class added successfully', 'success');
+            }
+            
+            saveDataToStorage();
+            populateClassesTable();
+            populateClassSelects();
+            initializeDashboard();
+            
+            // Close modal
+            modal.classList.remove('show');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function saveStudent() {
+            const rollNo = document.getElementById('newStudentRollNo').value.trim();
+            const name = document.getElementById('newStudentName').value.trim();
+            const classId = parseInt(document.getElementById('newStudentClass').value);
+            const email = document.getElementById('newStudentEmail').value.trim();
+            const phone = document.getElementById('newStudentPhone').value.trim();
+            
+            if (!rollNo || !name || !classId) {
+                showNotification('Please fill in all required fields', 'error');
+                return;
+            }
+            
+            const modal = document.getElementById('addStudentModal');
+            const editingId = modal.dataset.editingId;
+            
+            // Check for duplicate roll number (excluding current student if editing)
+            const duplicateRollNo = appData.students.find(s => 
+                s.rollNo === rollNo && s.id != editingId
+            );
+            
+            if (duplicateRollNo) {
+                showNotification('Roll number already exists', 'error');
+                return;
+            }
+            
+            if (editingId) {
+                // Update existing student
+                const student = appData.students.find(s => s.id == editingId);
+                if (student) {
+                    student.rollNo = rollNo;
+                    student.name = name;
+                    student.classId = classId;
+                    student.email = email;
+                    student.phone = phone;
+                }
+                showNotification('Student updated successfully', 'success');
+            } else {
+                // Add new student
+                const newId = appData.students.length > 0 ? 
+                    Math.max(...appData.students.map(s => s.id)) + 1 : 1;
+                
+                appData.students.push({
+                    id: newId,
+                    rollNo: rollNo,
+                    name: name,
+                    classId: classId,
+                    email: email,
+                    phone: phone
+                });
+                showNotification('Student added successfully', 'success');
+            }
+            
+            saveDataToStorage();
+            populateStudentsTable();
+            initializeDashboard();
+            
+            // Close modal
+            modal.classList.remove('show');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function downloadSampleFile(e) {
+            e.preventDefault();
+            
+            const sampleData = [
+                ['Roll No', 'Name', 'Email', 'Phone'],
+                ['2024001', 'John Doe', 'john@example.com', '+1234567890'],
+                ['2024002', 'Jane Smith', 'jane@example.com', '+1234567891'],
+                ['2024003', 'Bob Johnson', 'bob@example.com', '+1234567892']
+            ];
+            
+            const ws = XLSX.utils.aoa_to_sheet(sampleData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Students Sample');
+            
+            XLSX.writeFile(wb, 'students_sample.xlsx');
+            showNotification('Sample file downloaded', 'success');
+        }
+
+        function importStudents() {
+            const classId = parseInt(document.getElementById('importClassSelect').value);
+            const fileInput = document.getElementById('studentImportFile');
+            
+            if (!classId) {
+                showNotification('Please select a class', 'error');
+                return;
+            }
+            
+            if (!fileInput.files || !fileInput.files[0]) {
+                showNotification('Please select a file to import', 'error');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                    
+                    if (jsonData.length < 2) {
+                        throw new Error('File must contain at least a header row and one data row');
+                    }
+                    
+                    const headers = jsonData[0].map(h => h.toString().toLowerCase());
+                    const rollNoIndex = headers.findIndex(h => h.includes('roll'));
+                    const nameIndex = headers.findIndex(h => h.includes('name'));
+                    const emailIndex = headers.findIndex(h => h.includes('email'));
+                    const phoneIndex = headers.findIndex(h => h.includes('phone'));
+                    
+                    if (rollNoIndex === -1 || nameIndex === -1) {
+                        throw new Error('File must contain "Roll No" and "Name" columns');
+                    }
+                    
+                    const studentsToImport = [];
+                    const existingRollNos = new Set(appData.students.map(s => s.rollNo));
+                    let duplicateCount = 0;
+                    
+                    for (let i = 1; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        if (!row[rollNoIndex] || !row[nameIndex]) continue;
+                        
+                        const rollNo = row[rollNoIndex].toString().trim();
+                        const name = row[nameIndex].toString().trim();
+                        const email = emailIndex !== -1 ? (row[emailIndex] || '').toString().trim() : '';
+                        const phone = phoneIndex !== -1 ? (row[phoneIndex] || '').toString().trim() : '';
+                        
+                        if (existingRollNos.has(rollNo)) {
+                            duplicateCount++;
+                            continue;
+                        }
+                        
+                        studentsToImport.push({
+                            rollNo,
+                            name,
+                            email,
+                            phone,
+                            classId
+                        });
+                        
+                        existingRollNos.add(rollNo);
+                    }
+                    
+                    if (studentsToImport.length === 0) {
+                        showNotification('No valid students found to import', 'error');
+                        return;
+                    }
+                    
+                    // Add students to database
+                    let currentMaxId = appData.students.length > 0 ? 
+                        Math.max(...appData.students.map(s => s.id)) : 0;
+                    
+                    studentsToImport.forEach(student => {
+                        appData.students.push({
+                            ...student,
+                            id: ++currentMaxId
+                        });
+                    });
+                    
+                    saveDataToStorage();
+                    populateStudentsTable();
+                    initializeDashboard();
+                    
+                    let message = `${studentsToImport.length} students imported successfully`;
+                    if (duplicateCount > 0) {
+                        message += ` (${duplicateCount} duplicates skipped)`;
+                    }
+                    
+                    showNotification(message, 'success');
+                    
+                    // Close modal
+                    const modal = document.getElementById('importStudentsModal');
+                    modal.classList.remove('show');
+                    setTimeout(() => modal.classList.add('hidden'), 300);
+                    
+                } catch (error) {
+                    showNotification(`Import failed: ${error.message}`, 'error');
+                }
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Make functions globally available for onclick handlers
+        window.editClass = editClass;
+        window.confirmDeleteClass = confirmDeleteClass;
+        window.editStudent = editStudent;
+        window.confirmDeleteStudent = confirmDeleteStudent;
+        window.showSection = showSection;
+    </script>
+</body>
+</html>
